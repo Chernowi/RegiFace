@@ -641,7 +641,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // New handler for submitting defense cards
     async function handleSubmitDefense() {
-        if selectedCardsInHand.length === 0) {
+        if (selectedCardsInHand.length === 0) {
             showGameMessage("You must select cards to discard for defense, or it's game over if you cannot meet the damage.", true);
             // Note: The API will determine if the defense is sufficient.
             // Forcing a card selection here might be too strict if API allows empty discard for 0 damage.
