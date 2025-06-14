@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- Configuration ---
-    const API_BASE_URL = 'YOUR_RENDER_API_URL_HERE'; // e.g., https://your-regicide-api.onrender.com
+    const API_BASE_URL = 'https://regiside.onrender.com'; // e.g., https://your-regicide-api.onrender.com
     const CARD_IMAGE_PATH = 'img/cards/';
     let POLLING_INTERVAL = 3000; // Poll for game state every 3 seconds
 
@@ -378,10 +378,4 @@ document.addEventListener('DOMContentLoaded', () => {
     playSelectedBtn.addEventListener('click', handlePlaySelectedCards);
     yieldBtn.addEventListener('click', handleYieldTurn);
     soloJokerBtn.addEventListener('click', handleSoloJoker);
-
-    // Initial check for API URL
-    if (API_BASE_URL === 'YOUR_RENDER_API_URL_HERE') {
-        showSetupError("Developer: API_BASE_URL is not set in script.js!");
-        alert("Developer: API_BASE_URL is not set in script.js!");
-    }
 });
