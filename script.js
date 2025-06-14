@@ -243,14 +243,19 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         // For simplicity, using name as ID. In a real app, use a unique ID.
-        currentPlayerId = currentPlayerName + "_" + Date.now(); // Simple unique enough ID for this demo
+        let initialPlayerId = currentPlayerName + "_" + Date.now(); // Simple unique enough ID for this demo
 
         try {
-            const response = await apiCall('/api/create_room', 'POST', {
-                player_id: currentPlayerId,
+            const createRoomResponse = await apiCall('/api/create_room', 'POST', {
+                player_id: initialPlayerId,
                 player_name: currentPlayerName
             });
-            currentRoomCode = response.room_code; // Assuming API returns {room_code: ..., player_id: ...}
+            // Assuming API returns {data: {room_code: ..., player_id: ...}} 
+            // and apiCall returns the inner 'data' object.
+            // Or if apiCall returns the full response, it might be response.data.room_code
+            currentRoomCode = createRoomResponse.room_code; 
+            currentPlayerId = createRoomResponse.player_id; // Use the player_id from the API response
+
             startGameScreen();
             fetchGameState(); // Initial fetch
             startPolling();
