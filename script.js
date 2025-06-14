@@ -28,16 +28,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const enemyHealthEl = document.getElementById('enemyHealth');
     const enemyAttackEl = document.getElementById('enemyAttack');
     const enemyShieldEl = document.getElementById('enemyShield');
+    const enemyImmunityStatusEl = document.getElementById('enemyImmunityStatus'); // New
     const playerHandEl = document.getElementById('playerHand');
     const currentPlayerNameEl = document.getElementById('currentPlayerName');
     const playSelectedBtn = document.getElementById('playSelectedBtn');
     const yieldBtn = document.getElementById('yieldBtn');
+    const submitDefenseBtn = document.getElementById('submitDefenseBtn'); // New
     const soloJokerBtn = document.getElementById('soloJokerBtn');
     const otherPlayersListEl = document.getElementById('otherPlayersList');
     const tavernDeckSizeEl = document.getElementById('tavernDeckSize');
     const castleDeckSizeEl = document.getElementById('castleDeckSize');
     const hospitalSizeEl = document.getElementById('hospitalSize');
     const gameStateDebugEl = document.getElementById('gameStateDebug');
+    const jesterChoiceAreaEl = document.getElementById('jesterChoiceArea'); // New
+    const jesterPlayerChoicesListEl = document.getElementById('jesterPlayerChoicesList'); // New
+    const confirmJesterChoiceBtn = document.getElementById('confirmJesterChoiceBtn'); // New
 
 
     // --- Helper Functions ---
@@ -125,15 +130,25 @@ document.addEventListener('DOMContentLoaded', () => {
         currentGameState = gameState; // Store the latest state
         gameStateDebugEl.textContent = JSON.stringify(gameState, null, 2);
 
-
         gameRoomCodeEl.textContent = `Room: ${currentRoomCode}`;
         currentPlayerNameEl.textContent = currentPlayerName || "Player";
+
+        // Reset UI elements to default states
+        playSelectedBtn.style.display = 'none';
+        yieldBtn.style.display = 'none';
+        submitDefenseBtn.style.display = 'none';
+        jesterChoiceAreaEl.style.display = 'none';
+        startGameBtn.style.display = 'none';
+        enemyImmunityStatusEl.style.display = 'none';
+        playerHandEl.innerHTML = ''; // Clear hand before re-rendering
+
+        if (gameState.active_joker_cancels_immunity) {
+            enemyImmunityStatusEl.style.display = 'block';
+        }
 
         // Show Start Game button if user is creator and game is waiting
         if (gameState.status === "WAITING_FOR_PLAYERS" && gameState.created_by_player_id === currentPlayerId) {
             startGameBtn.style.display = 'inline-block';
-        } else {
-            startGameBtn.style.display = 'none';
         }
 
         // Enemy
@@ -149,10 +164,40 @@ document.addEventListener('DOMContentLoaded', () => {
             enemyShieldEl.textContent = '0';
         }
 
-        // Player Hand
-        playerHandEl.innerHTML = '';
+        // Player Hand & Actions based on game state
         const localPlayer = gameState.players.find(p => p.id === currentPlayerId);
-        let isMyTurn = gameState.current_player_id === currentPlayerId;
+        let canPlayerAct = false;
+
+        if (gameState.status === "IN_PROGRESS") {
+            if (gameState.current_player_id === currentPlayerId) {
+                canPlayerAct = true;
+                playSelectedBtn.style.display = 'inline-block';
+                yieldBtn.style.display = 'inline-block';
+                showGameMessage(`Your turn, ${currentPlayerName}.`);
+            } else {
+                const P = gameState.players.find(p => p.id === gameState.current_player_id);
+                showGameMessage(`Waiting for ${P ? P.name : 'opponent'}...`);
+            }
+        } else if (gameState.status === "AWAITING_DEFENSE") {
+            if (gameState.player_to_defend_id === currentPlayerId) {
+                canPlayerAct = true; // Can select cards for defense
+                submitDefenseBtn.style.display = 'inline-block';
+                showGameMessage(`You must defend against ${gameState.damage_to_defend} damage! Select cards to discard.`);
+            } else {
+                const P = gameState.players.find(p => p.id === gameState.player_to_defend_id);
+                showGameMessage(`Waiting for ${P ? P.name : 'player'} to defend...`);
+            }
+        } else if (gameState.status === "AWAITING_JESTER_CHOICE") {
+            if (gameState.jester_chooser_id === currentPlayerId) {
+                jesterChoiceAreaEl.style.display = 'block';
+                populateJesterChoices(gameState.players, currentPlayerId);
+                showGameMessage("You played a Jester! Choose the next player.");
+            } else {
+                const P = gameState.players.find(p => p.id === gameState.jester_chooser_id);
+                showGameMessage(`Waiting for ${P ? P.name : 'player'} to choose the next player...`);
+            }
+        }
+
 
         if (localPlayer && localPlayer.hand) {
             localPlayer.hand.forEach(cardStr => {
@@ -161,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 cardImg.alt = cardStr;
                 cardImg.dataset.card = cardStr; // Store card value
 
-                if (isMyTurn && gameState.status === "IN_PROGRESS") {
+                if (canPlayerAct || (gameState.status === "AWAITING_DEFENSE" && gameState.player_to_defend_id === currentPlayerId)) {
                     cardImg.classList.add('playable');
                     cardImg.onclick = () => toggleSelectCard(cardImg, cardStr);
                     if (selectedCardsInHand.includes(cardStr)) {
@@ -174,11 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // Disable action buttons if not player's turn or game over
-        playSelectedBtn.disabled = !isMyTurn || gameState.status !== "IN_PROGRESS";
-        yieldBtn.disabled = !isMyTurn || gameState.status !== "IN_PROGRESS";
-
-
         // Other Players
         otherPlayersListEl.innerHTML = '';
         gameState.players.filter(p => p.id !== currentPlayerId).forEach(p => {
@@ -193,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hospitalSizeEl.textContent = gameState.hospital_size;
 
         // Solo Joker Button
-        if (gameState.players.length === 1 && gameState.solo_jokers_available > 0 && isMyTurn) {
+        if (gameState.players.length === 1 && gameState.solo_jokers_available > 0 && gameState.current_player_id === currentPlayerId && gameState.status === "IN_PROGRESS") {
             soloJokerBtn.style.display = 'inline-block';
             soloJokerBtn.textContent = `Use Solo Joker (${gameState.solo_jokers_available} left)`;
             soloJokerBtn.disabled = false;
@@ -210,8 +250,8 @@ document.addEventListener('DOMContentLoaded', () => {
             showGameMessage(`Game Over! ${gameState.action_message || 'The Royals have defeated you.'}`, true);
             stopPolling();
             disableAllGameActions();
-        } else if (gameState.action_message && gameState.action_message !== "Success") {
-             // Display action messages from API if any (e.g., after playing a card)
+        } else if (gameState.action_message && gameState.action_message !== "Success" && gameState.status !== "IN_PROGRESS" && gameState.status !== "AWAITING_DEFENSE" && gameState.status !== "AWAITING_JESTER_CHOICE") {
+            // Display general action messages if not handled by specific state messages
             showGameMessage(gameState.action_message);
         }
     }
@@ -219,8 +259,31 @@ document.addEventListener('DOMContentLoaded', () => {
     function disableAllGameActions() {
         playSelectedBtn.disabled = true;
         yieldBtn.disabled = true;
+        submitDefenseBtn.disabled = true; // New
+        confirmJesterChoiceBtn.disabled = true; // New
         soloJokerBtn.disabled = true;
-        playerHandEl.querySelectorAll('img').forEach(img => img.classList.add('disabled'));
+        playerHandEl.querySelectorAll('img').forEach(img => {
+            img.classList.add('disabled');
+            img.onclick = null; // Remove click handlers
+        });
+        jesterChoiceAreaEl.style.display = 'none';
+    }
+
+    function populateJesterChoices(players, chooserId) {
+        jesterPlayerChoicesListEl.innerHTML = '';
+        players.forEach(player => {
+            const label = document.createElement('label');
+            label.style.display = 'block';
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'jesterNextPlayer';
+            radio.value = player.id;
+            if (player.id === chooserId) radio.checked = true; // Default to self or first
+
+            label.appendChild(radio);
+            label.appendChild(document.createTextNode(` ${player.name}`));
+            jesterPlayerChoicesListEl.appendChild(label);
+        });
     }
 
 
@@ -299,12 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Pass player_id for perspective (to see own hand)
             const gameState = await apiCall(`/api/game_state/${currentRoomCode}?player_id=${currentPlayerId}`);
             if (gameState) {
-                 if (gameState.action_message && currentGameState && gameState.action_message !== currentGameState.action_message){
-                    showGameMessage(gameState.action_message); // Show messages from API
-                } else if (!gameState.action_message && currentGameState && currentGameState.action_message && currentGameState.action_message !== "Success") {
-                    // Clear message if new state has no message but old one did
-                    // showGameMessage("Your turn or waiting for opponent...");
-                }
+                 // More specific message handling is now in renderGameState based on status
                 renderGameState(gameState);
             }
         } catch (error) {
@@ -332,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function startGameScreen() {
         setupScreen.style.display = 'none';
         gameScreen.style.display = 'block';
-        showGameMessage(`Joined Room: ${currentRoomCode}. Waiting for game to start or for your turn.`);
+        // Initial message will be set by renderGameState
     }
 
     async function handlePlaySelectedCards() {
@@ -353,7 +411,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Polling will continue to update, or can rely on this direct update.
         } catch (error) {
             showGameMessage(error.message || "Failed to play cards.", true);
-            // Don't clear selected cards on error, let user retry or change.
+            // Fetch current state to ensure UI consistency after error
+            fetchGameState();
         }
     }
 
@@ -368,6 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderGameState(updatedGameState);
         } catch (error) {
             showGameMessage(error.message || "Failed to yield turn.", true);
+            fetchGameState();
         }
     }
     
@@ -381,6 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderGameState(updatedGameState);
         } catch (error) {
             showGameMessage(error.message || "Failed to use Solo Joker power.", true);
+            fetchGameState();
         }
     }
 
@@ -400,6 +461,54 @@ document.addEventListener('DOMContentLoaded', () => {
             // Polling will continue to update the state for all players.
         } catch (error) {
             showGameMessage(error.message || "Failed to start game.", true);
+            fetchGameState();
+        }
+    }
+
+    // New handler for submitting defense cards
+    async function handleSubmitDefense() {
+        if (selectedCardsInHand.length === 0) {
+            showGameMessage("You must select cards to discard for defense, or it's game over if you cannot meet the damage.", true);
+            // Note: The API will determine if the defense is sufficient.
+            // Forcing a card selection here might be too strict if API allows empty discard for 0 damage.
+            // However, usually damage > 0.
+        }
+        try {
+            const updatedGameState = await apiCall('/api/defend', 'POST', {
+                room_code: currentRoomCode,
+                player_id: currentPlayerId, // The API expects the ID of the player defending
+                cards: selectedCardsInHand
+            });
+            selectedCardsInHand = [];
+            showGameMessage(updatedGameState.action_message || "Defense submitted.");
+            renderGameState(updatedGameState);
+        } catch (error) {
+            showGameMessage(error.message || "Failed to submit defense.", true);
+            // Potentially game over, fetch state to confirm
+            fetchGameState();
+        }
+    }
+
+    // New handler for confirming Jester's choice of next player
+    async function handleConfirmJesterChoice() {
+        const selectedRadio = jesterPlayerChoicesListEl.querySelector('input[name="jesterNextPlayer"]:checked');
+        if (!selectedRadio) {
+            showGameMessage("Please select a player to go next.", true);
+            return;
+        }
+        const chosenPlayerId = selectedRadio.value;
+
+        try {
+            const updatedGameState = await apiCall('/api/choose_next_player', 'POST', {
+                room_code: currentRoomCode,
+                player_id: currentPlayerId, // The API expects the ID of the player who played the Jester
+                chosen_player_id: chosenPlayerId
+            });
+            showGameMessage(updatedGameState.action_message || "Next player chosen.");
+            renderGameState(updatedGameState);
+        } catch (error) {
+            showGameMessage(error.message || "Failed to choose next player.", true);
+            fetchGameState();
         }
     }
 
@@ -411,4 +520,6 @@ document.addEventListener('DOMContentLoaded', () => {
     playSelectedBtn.addEventListener('click', handlePlaySelectedCards);
     yieldBtn.addEventListener('click', handleYieldTurn);
     soloJokerBtn.addEventListener('click', handleSoloJoker);
+    submitDefenseBtn.addEventListener('click', handleSubmitDefense); // New
+    confirmJesterChoiceBtn.addEventListener('click', handleConfirmJesterChoice); // New
 });

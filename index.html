@@ -32,6 +32,7 @@
             </div>
             <p>Health: <span id="enemyHealth">--</span></p>
             <p>Attack: <span id="enemyAttack">--</span> (Shield: <span id="enemyShield">0</span>)</p>
+            <p id="enemyImmunityStatus" style="font-style: italic; color: green; display: none;">Immunity Cancelled by Jester!</p>
         </div>
 
         <div id="player-area">
@@ -42,7 +43,15 @@
             <div id="player-actions">
                 <button id="playSelectedBtn">Play Selected Cards</button>
                 <button id="yieldBtn">Yield Turn</button>
+                <button id="submitDefenseBtn" style="display: none;">Submit Defense Cards</button>
                 <button id="soloJokerBtn" style="display: none;">Use Solo Joker Power</button>
+            </div>
+            <div id="jesterChoiceArea" style="display: none; margin-top: 10px;">
+                <h4>Choose Next Player:</h4>
+                <div id="jesterPlayerChoicesList">
+                    <!-- Player choices will be populated here -->
+                </div>
+                <button id="confirmJesterChoiceBtn" style="margin-top: 5px;">Confirm Choice</button>
             </div>
         </div>
         
