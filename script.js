@@ -208,6 +208,34 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     }
 
+    // Add this new helper function
+    function getSelectedCardsDefenseValue() {
+        if (!currentGameState || !selectedCardsInHand || selectedCardsInHand.length === 0) {
+            return 0;
+        }
+        return selectedCardsInHand.reduce((sum, cardStr) => {
+            const cardInfo = getCardInfo(cardStr);
+            // Use attackValue from getCardInfo, as it aligns with discard values (J=10, Q=15, K=20, A=1, Num=Val, X=0)
+            return sum + (cardInfo ? cardInfo.attackValue : 0); 
+        }, 0);
+    }
+
+    // Add this new function to manage the defense button state
+    function updateDefenseButtonState() {
+        if (currentGameState && currentGameState.status === "AWAITING_DEFENSE") {
+            // Ensure the button is visible before trying to enable/disable it
+            // The visibility is controlled by renderGameState
+            if (submitDefenseBtn.style.display !== 'none') {
+                const defenseValue = getSelectedCardsDefenseValue();
+                const requiredDefense = currentGameState.damage_to_defend || 0;
+                submitDefenseBtn.disabled = defenseValue < requiredDefense;
+            }
+        } else {
+            // If not in defense mode, ensure button is disabled (though likely hidden by renderGameState)
+            // submitDefenseBtn.disabled = true; 
+        }
+    }
+
 
     async function apiCall(endpoint, method = 'GET', body = null) {
         const url = `${API_BASE_URL}${endpoint}`;
@@ -385,6 +413,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Display general action messages if not handled by specific state messages
             showGameMessage(gameState.action_message);
         }
+        // Call after hand rendering and other UI updates for the current state:
+        updateDefenseButtonState(); 
     }
     
     function disableAllGameActions() {
@@ -430,38 +460,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function toggleSelectCard(cardImgEl, cardStr) {
         const isCurrentlySelected = selectedCardsInHand.includes(cardStr);
-        let newSelectionAttempt = [];
 
-        if (isCurrentlySelected) {
-            // Attempt to deselect the card
-            newSelectionAttempt = selectedCardsInHand.filter(c => c !== cardStr);
-        } else {
-            // Attempt to add the card to the current selection
-            const potentialSelectionWithAddition = [...selectedCardsInHand, cardStr];
-            if (checkPlayValidity(potentialSelectionWithAddition)) {
-                newSelectionAttempt = potentialSelectionWithAddition;
+        if (currentGameState && currentGameState.status === "AWAITING_DEFENSE") {
+            // For defense, allow any card to be selected or deselected.
+            // The submitDefenseBtn will be enabled/disabled based on total value.
+            if (isCurrentlySelected) {
+                selectedCardsInHand = selectedCardsInHand.filter(c => c !== cardStr);
             } else {
-                // If adding the card makes the current selection invalid,
-                // try selecting this card alone. This allows switching play types.
-                if (checkPlayValidity([cardStr])) { // A single card is always a valid selection start
-                    newSelectionAttempt = [cardStr];
-                    // Optionally, provide feedback if the selection was reset
-                    // if (selectedCardsInHand.length > 0) {
-                    //     showGameMessage("Selection changed.", false);
-                    // }
+                selectedCardsInHand.push(cardStr);
+            }
+        } else {
+            // Original logic for "IN_PROGRESS" (playing cards) using checkPlayValidity
+            let newSelectionAttempt = [];
+            if (isCurrentlySelected) {
+                // Attempt to deselect the card
+                newSelectionAttempt = selectedCardsInHand.filter(c => c !== cardStr);
+            } else {
+                // Attempt to add the card to the current selection
+                const potentialSelectionWithAddition = [...selectedCardsInHand, cardStr];
+                if (checkPlayValidity(potentialSelectionWithAddition)) {
+                    newSelectionAttempt = potentialSelectionWithAddition;
                 } else {
-                    // This case should ideally not be reached if checkPlayValidity([cardStr]) is robust
-                    // and any single card is considered a valid selection unit.
-                    showGameMessage("This card cannot be selected in this manner.", true);
-                    // Do not change selectedCardsInHand, just update UI to reflect current state
-                    updateHandSelectionUI();
-                    return;
+                    // If adding the card makes the current selection invalid,
+                    // try selecting this card alone. This allows switching play types.
+                    if (checkPlayValidity([cardStr])) { // A single card is always a valid selection start
+                        newSelectionAttempt = [cardStr];
+                    } else {
+                        // This case should ideally not be reached if checkPlayValidity([cardStr]) is robust
+                        showGameMessage("This card cannot be selected in this manner.", true);
+                        updateHandSelectionUI(); // Re-render to show current valid selection
+                        updateDefenseButtonState(); // Also update defense button if relevant
+                        return;
+                    }
                 }
             }
+            selectedCardsInHand = newSelectionAttempt;
         }
 
-        selectedCardsInHand = newSelectionAttempt;
         updateHandSelectionUI();
+        updateDefenseButtonState(); // Call this after any selection change
     }
 
     // --- API Interaction Functions ---
@@ -641,11 +678,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // New handler for submitting defense cards
     async function handleSubmitDefense() {
-        if (selectedCardsInHand.length === 0) {
-            showGameMessage("You must select cards to discard for defense, or it's game over if you cannot meet the damage.", true);
-            // Note: The API will determine if the defense is sufficient.
-            // Forcing a card selection here might be too strict if API allows empty discard for 0 damage.
-            // However, usually damage > 0.
+        // The button should be disabled by updateDefenseButtonState if selection is insufficient.
+        // This message can serve as a fallback or if the player somehow tries to submit with 0 cards
+        // when damage > 0 (though the button should be disabled).
+        if (selectedCardsInHand.length === 0 && currentGameState && currentGameState.damage_to_defend > 0) {
+            showGameMessage("You must select cards to discard for defense.", true);
+            // return; // It might be better to let the API decide if an empty hand for defense is a game-losing move.
         }
         try {
             const updatedGameState = await apiCall('/api/defend', 'POST', {
