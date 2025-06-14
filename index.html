@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Regicide Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="setup-screen">
+        <h1>Regicide</h1>
+        <input type="text" id="playerName" placeholder="Enter your name">
+        <div class="room-actions">
+            <input type="text" id="roomCodeInput" placeholder="Room Code (optional)">
+            <button id="createRoomBtn">Create Room</button>
+            <button id="joinRoomBtn">Join Room</button>
+        </div>
+        <p id="setupError" class="error-message"></p>
+    </div>
+
+    <div id="game-screen" style="display: none;">
+        <header>
+            <h1 id="gameRoomCode">Room: ----</h1>
+            <div id="gameMessages">Welcome!</div>
+        </header>
+
+        <div id="enemy-area">
+            <h2>Enemy</h2>
+            <div class="card-display" id="enemyCard">
+                <!-- <img src="img/cards/KS.png" alt="King of Spades"> -->
+            </div>
+            <p>Health: <span id="enemyHealth">--</span></p>
+            <p>Attack: <span id="enemyAttack">--</span> (Shield: <span id="enemyShield">0</span>)</p>
+        </div>
+
+        <div id="player-area">
+            <h2>Your Hand (<span id="currentPlayerName">Player</span>)</h2>
+            <div id="playerHand" class="hand-display">
+                <!-- Cards will be added here -->
+            </div>
+            <div id="player-actions">
+                <button id="playSelectedBtn">Play Selected Cards</button>
+                <button id="yieldBtn">Yield Turn</button>
+                <button id="soloJokerBtn" style="display: none;">Use Solo Joker Power</button>
+            </div>
+        </div>
+        
+        <div id="other-players-area">
+            <h2>Other Players</h2>
+            <ul id="otherPlayersList">
+                <!-- <li>Player 2 (Hand: 7)</li> -->
+            </ul>
+        </div>
+
+        <div id="deck-info">
+            <p>Tavern Deck: <span id="tavernDeckSize">--</span></p>
+            <p>Castle Deck: <span id="castleDeckSize">--</span></p>
+            <p>Hospital (Discard): <span id="hospitalSize">--</span></p>
+        </div>
+         <div id="debugInfo" style="margin-top:20px; font-size: 0.8em; background: #eee; padding: 10px;">
+            <h3>Debug / Full State:</h3>
+            <pre id="gameStateDebug"></pre>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

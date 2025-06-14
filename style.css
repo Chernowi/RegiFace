@@ -1,0 +1,140 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f4f4;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#setup-screen, #game-screen {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 800px;
+    margin-bottom: 20px;
+}
+
+h1, h2 {
+    color: #5a3a3a;
+    text-align: center;
+}
+
+input[type="text"] {
+    width: calc(100% - 22px);
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+button {
+    background-color: #8c5e58;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 5px;
+    font-size: 1em;
+}
+
+button:hover {
+    background-color: #704b46;
+}
+
+.room-actions {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.room-actions input {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+.error-message {
+    color: red;
+    font-size: 0.9em;
+    text-align: center;
+    min-height: 1.2em;
+}
+
+#game-screen header {
+    border-bottom: 1px solid #eee;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+}
+
+#gameMessages {
+    text-align: center;
+    font-weight: bold;
+    min-height: 1.5em;
+    padding: 5px;
+    background-color: #e8f4f8;
+    border-radius: 4px;
+}
+
+#enemy-area, #player-area, #other-players-area, #deck-info {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    background-color: #f9f9f9;
+}
+
+.card-display img, .hand-display img {
+    width: 70px; /* Adjust as needed */
+    height: auto;
+    margin: 2px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer; /* For player hand cards */
+    transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+}
+
+.hand-display img.selected {
+    border: 2px solid #3498db;
+    box-shadow: 0 0 8px #3498db;
+    transform: scale(1.05);
+}
+.hand-display img.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+
+#player-actions {
+    text-align: center;
+    margin-top: 10px;
+}
+
+#otherPlayersList {
+    list-style: none;
+    padding: 0;
+}
+#otherPlayersList li {
+    padding: 5px;
+    border-bottom: 1px dashed #eee;
+}
+#otherPlayersList li:last-child {
+    border-bottom: none;
+}
+
+#deck-info p {
+    margin: 5px 0;
+}
+#gameStateDebug {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    padding: 5px;
+}
