@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomCodeInput = document.getElementById('roomCodeInput');
     const createRoomBtn = document.getElementById('createRoomBtn');
     const joinRoomBtn = document.getElementById('joinRoomBtn');
+    const startGameBtn = document.getElementById('startGameBtn'); // Get the new button
     const setupErrorEl = document.getElementById('setupError');
 
     const gameRoomCodeEl = document.getElementById('gameRoomCode');
@@ -127,6 +128,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         gameRoomCodeEl.textContent = `Room: ${currentRoomCode}`;
         currentPlayerNameEl.textContent = currentPlayerName || "Player";
+
+        // Show Start Game button if user is creator and game is waiting
+        if (gameState.status === "WAITING_FOR_PLAYERS" && gameState.created_by_player_id === currentPlayerId) {
+            startGameBtn.style.display = 'inline-block';
+        } else {
+            startGameBtn.style.display = 'none';
+        }
 
         // Enemy
         if (gameState.current_enemy) {
@@ -371,10 +379,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Add this new function
+    async function handleStartGame() {
+        if (!currentRoomCode || !currentPlayerId) {
+            showGameMessage("Cannot start game: Room or Player ID missing.", true);
+            return;
+        }
+        try {
+            const updatedGameState = await apiCall('/api/start_game', 'POST', {
+                room_code: currentRoomCode,
+                player_id: currentPlayerId // API requires player_id of creator
+            });
+            showGameMessage(updatedGameState.message || "Game started successfully!");
+            renderGameState(updatedGameState); // Render the state received from start_game
+            // Polling will continue to update the state for all players.
+        } catch (error) {
+            showGameMessage(error.message || "Failed to start game.", true);
+        }
+    }
+
 
     // --- Event Listeners ---
     createRoomBtn.addEventListener('click', handleCreateRoom);
     joinRoomBtn.addEventListener('click', handleJoinRoom);
+    startGameBtn.addEventListener('click', handleStartGame); // Add event listener for the new button
     playSelectedBtn.addEventListener('click', handlePlaySelectedCards);
     yieldBtn.addEventListener('click', handleYieldTurn);
     soloJokerBtn.addEventListener('click', handleSoloJoker);
