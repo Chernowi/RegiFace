@@ -39,11 +39,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const tavernDeckSizeEl = document.getElementById('tavernDeckSize');
     const castleDeckSizeEl = document.getElementById('castleDeckSize');
     const hospitalSizeEl = document.getElementById('hospitalSize');
+    const hospitalCardsDisplayEl = document.getElementById('hospitalCardsDisplay'); // New UI Element
     const gameStateDebugEl = document.getElementById('gameStateDebug');
     const jesterChoiceAreaEl = document.getElementById('jesterChoiceArea'); // New
     const jesterPlayerChoicesListEl = document.getElementById('jesterPlayerChoicesList'); // New
     const confirmJesterChoiceBtn = document.getElementById('confirmJesterChoiceBtn'); // New
-
 
     // --- Helper Functions ---
     function showSetupError(message) {
@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Maps API card string (e.g., "SA", "H10", "CJ", "X") to image filename.
-     * Assumes images are named like AS.png, 10H.png, JC.png, JOKER.png
+     * Assumes images are named like AS.png, 10D.png, JC.png, JOKER.png
      */
     function getCardImageSrc(cardStr) {
         if (!cardStr || typeof cardStr !== 'string') return `${CARD_IMAGE_PATH}card_back.png`; // Default or back
@@ -66,33 +66,146 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cardStr.toUpperCase() === 'X') {
             return `${CARD_IMAGE_PATH}JOKER.png`;
         }
+        // Card string for images is RankSuit.png e.g. AC.png, 10D.png, KH.png
+        // API uses RankSuit e.g. AC, 10D, KH
+        // Ensure cardStr matches the format expected by image names (e.g. "AS", "10D")
+        // The existing logic seems to correctly form RankSuit from various inputs.
+        // For "AS", rank="A", suit="S" -> AS.png
+        // For "10D", rank="10", suit="D" -> 10D.png
+        // This function is primarily for image lookup, not detailed game logic.
 
         let rank = '';
         let suit = '';
 
-        // Standard format: Rank(s) then Suit. e.g. "SA", "10H", "CJ"
-        // Our images: Rank + Suit, e.g. AS.png, 10H.png, JC.png
-        // API returns S A (Spade Ace)
-        // API returns H 10 (Heart 10)
-        // API returns C J (Club Jack)
-
-        // Let's assume the API returns Rank then Suit for consistency in string format
-        // e.g. "AS", "2H", "10D", "JC", "QK", "KH"
-        // If API returns "SA", "H10", we need to adjust parsing or image names.
-        // Based on the python engine, it's Rank+Suit, e.g. card.rank + card.suit
-        // So "AS" is Ace of Spades, "2H" is 2 of Hearts, "10D" is 10 of Diamonds.
-
-        if (cardStr.length === 2) { // AS, KH, 2D, etc. OR 10 (needs special handling)
+        if (cardStr.length === 2) { 
             rank = cardStr.substring(0, 1);
             suit = cardStr.substring(1, 2);
-        } else if (cardStr.length === 3 && cardStr.startsWith('10')) { // 10S, 10H, etc.
+        } else if (cardStr.length === 3 && cardStr.startsWith('10')) { 
             rank = "10";
             suit = cardStr.substring(2, 3);
         } else {
-            console.warn("Unknown card string format:", cardStr);
+            console.warn("Unknown card string format for image:", cardStr);
             return `${CARD_IMAGE_PATH}card_back.png`; // Fallback
         }
         return `${CARD_IMAGE_PATH}${rank.toUpperCase()}${suit.toUpperCase()}.png`;
+    }
+
+    function getCardInfo(cardStr) {
+        if (!cardStr || typeof cardStr !== 'string') return null;
+
+        const info = {
+            id: cardStr, // Store the original string
+            rank: '',
+            suit: '',
+            value: 0, // Numeric value for combo checks (2-9 for cards 2-9, 1 for Ace)
+            attackValue: 0, // Actual attack value as per rules
+            isJester: false,
+            isAce: false,
+            isRoyal: false // J, Q, K
+        };
+
+        if (cardStr.toUpperCase() === 'X') {
+            info.isJester = true;
+            info.rank = 'X';
+            info.value = 0;
+            info.attackValue = 0;
+            return info;
+        }
+
+        let rankPart = '';
+        let suitPart = '';
+
+        if (cardStr.startsWith('10')) {
+            rankPart = "10";
+            suitPart = cardStr.substring(2, 3);
+        } else if (cardStr.length === 2) {
+            rankPart = cardStr.substring(0, 1);
+            suitPart = cardStr.substring(1, 2);
+        } else {
+            console.warn("Unknown card string for getCardInfo:", cardStr);
+            return null;
+        }
+
+        info.rank = rankPart.toUpperCase();
+        info.suit = suitPart.toUpperCase();
+
+        if (info.rank === 'A') {
+            info.isAce = true;
+            info.value = 1; // For sum checks, though Aces are excluded from same-rank combos
+            info.attackValue = 1;
+        } else if (info.rank === 'K') {
+            info.isRoyal = true;
+            info.value = 10; // Royals are not part of sum-to-10 combos
+            info.attackValue = 20;
+        } else if (info.rank === 'Q') {
+            info.isRoyal = true;
+            info.value = 10;
+            info.attackValue = 15;
+        } else if (info.rank === 'J') {
+            info.isRoyal = true;
+            info.value = 10;
+            info.attackValue = 10;
+        } else { // Numbered cards 2-9 and 10
+            const numericValue = parseInt(info.rank, 10);
+            if (!isNaN(numericValue)) {
+                info.value = numericValue; // This is used for sum-to-10 combo checks
+                info.attackValue = numericValue;
+            }
+        }
+        return info;
+    }
+
+    function checkPlayValidity(cardsArray) {
+        if (!cardsArray) return false;
+
+        const infos = cardsArray.map(getCardInfo);
+        if (infos.some(info => info === null)) {
+            console.error("Invalid card string found in selection:", cardsArray);
+            return false; // Contains unparseable card strings
+        }
+
+        const numCards = infos.length;
+
+        if (numCards === 0) {
+            return true; // No cards selected is a valid state (though not a valid play to submit)
+        }
+
+        if (numCards === 1) {
+            return true; // Any single card can be selected (and is a valid play)
+        }
+
+        // Check for Jester: Jesters can only be played alone.
+        if (infos.some(c => c.isJester)) {
+            return numCards === 1 && infos[0].isJester;
+        }
+
+        // Check for Ace + one other non-Jester card
+        if (numCards === 2) {
+            const hasAce = infos.some(c => c.isAce);
+            const hasJester = infos.some(c => c.isJester);
+            if (hasAce && !hasJester) {
+                // If one is Ace, the other must not be an Ace (Ace + Ace is not a special combo)
+                // Ace + Other (non-Ace, non-Jester) is valid.
+                const aceCount = infos.filter(c => c.isAce).length;
+                return aceCount === 1;
+            }
+        }
+
+        // Check for same-rank combo (2-9 cards, sum of values <= 10, no Aces, no Royals)
+        const firstCardInfo = infos[0];
+        if (!firstCardInfo.isAce && !firstCardInfo.isRoyal && !firstCardInfo.isJester) {
+            const allSameRank = infos.every(c =>
+                c.rank === firstCardInfo.rank &&
+                !c.isAce && !c.isRoyal && !c.isJester
+            );
+            if (allSameRank) {
+                const sumOfValues = infos.reduce((sum, c) => sum + c.value, 0);
+                return sumOfValues <= 10;
+            }
+        }
+        
+        // If it's not a single card, not an Ace pair, and not a valid same-rank combo, it's invalid for >1 card.
+        return false;
     }
 
 
@@ -232,6 +345,24 @@ document.addEventListener('DOMContentLoaded', () => {
         castleDeckSizeEl.textContent = gameState.castle_deck_size;
         hospitalSizeEl.textContent = gameState.hospital_size;
 
+        // Render Hospital Cards
+        if (hospitalCardsDisplayEl && gameState.hospital_cards) {
+            hospitalCardsDisplayEl.innerHTML = ''; // Clear previous cards
+            if (gameState.hospital_cards.length > 0) {
+                gameState.hospital_cards.forEach(cardStr => {
+                    const cardImg = document.createElement('img');
+                    cardImg.src = getCardImageSrc(cardStr);
+                    cardImg.alt = cardStr;
+                    // Add a class for specific styling if needed, e.g., smaller size
+                    // cardImg.classList.add('discard-pile-card'); 
+                    hospitalCardsDisplayEl.appendChild(cardImg);
+                });
+            } else {
+                hospitalCardsDisplayEl.innerHTML = '<i>Empty</i>';
+            }
+        }
+
+
         // Solo Joker Button
         if (gameState.players.length === 1 && gameState.solo_jokers_available > 0 && gameState.current_player_id === currentPlayerId && gameState.status === "IN_PROGRESS") {
             soloJokerBtn.style.display = 'inline-block';
@@ -286,16 +417,51 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function updateHandSelectionUI() {
+        const handImages = playerHandEl.querySelectorAll('img');
+        handImages.forEach(img => {
+            if (selectedCardsInHand.includes(img.dataset.card)) {
+                img.classList.add('selected');
+            } else {
+                img.classList.remove('selected');
+            }
+        });
+    }
 
     function toggleSelectCard(cardImgEl, cardStr) {
-        const index = selectedCardsInHand.indexOf(cardStr);
-        if (index > -1) {
-            selectedCardsInHand.splice(index, 1); // Remove if already selected
-            cardImgEl.classList.remove('selected');
+        const isCurrentlySelected = selectedCardsInHand.includes(cardStr);
+        let newSelectionAttempt = [];
+
+        if (isCurrentlySelected) {
+            // Attempt to deselect the card
+            newSelectionAttempt = selectedCardsInHand.filter(c => c !== cardStr);
         } else {
-            selectedCardsInHand.push(cardStr); // Add if not selected
-            cardImgEl.classList.add('selected');
+            // Attempt to add the card to the current selection
+            const potentialSelectionWithAddition = [...selectedCardsInHand, cardStr];
+            if (checkPlayValidity(potentialSelectionWithAddition)) {
+                newSelectionAttempt = potentialSelectionWithAddition;
+            } else {
+                // If adding the card makes the current selection invalid,
+                // try selecting this card alone. This allows switching play types.
+                if (checkPlayValidity([cardStr])) { // A single card is always a valid selection start
+                    newSelectionAttempt = [cardStr];
+                    // Optionally, provide feedback if the selection was reset
+                    // if (selectedCardsInHand.length > 0) {
+                    //     showGameMessage("Selection changed.", false);
+                    // }
+                } else {
+                    // This case should ideally not be reached if checkPlayValidity([cardStr]) is robust
+                    // and any single card is considered a valid selection unit.
+                    showGameMessage("This card cannot be selected in this manner.", true);
+                    // Do not change selectedCardsInHand, just update UI to reflect current state
+                    updateHandSelectionUI();
+                    return;
+                }
+            }
         }
+
+        selectedCardsInHand = newSelectionAttempt;
+        updateHandSelectionUI();
     }
 
     // --- API Interaction Functions ---
@@ -398,6 +564,14 @@ document.addEventListener('DOMContentLoaded', () => {
             showGameMessage("No cards selected to play.", true);
             return;
         }
+        // Validate the final selection before sending to the API
+        if (!checkPlayValidity(selectedCardsInHand)) {
+            showGameMessage("Invalid card combination. Please check your selection.", true);
+            // Example: if selection is [Ace, Ace] or [Ace, Jester]
+            // Or a combo that sums to > 10, or mixed ranks not involving an Ace.
+            return;
+        }
+
         try {
             // The play_cards endpoint in the example returns the full game state
             const updatedGameState = await apiCall('/api/play_cards', 'POST', {
@@ -467,7 +641,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // New handler for submitting defense cards
     async function handleSubmitDefense() {
-        if (selectedCardsInHand.length === 0) {
+        if selectedCardsInHand.length === 0) {
             showGameMessage("You must select cards to discard for defense, or it's game over if you cannot meet the damage.", true);
             // Note: The API will determine if the defense is sufficient.
             // Forcing a card selection here might be too strict if API allows empty discard for 0 damage.
