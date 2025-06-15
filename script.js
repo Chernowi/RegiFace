@@ -511,11 +511,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // For simplicity, using name as ID. In a real app, use a unique ID.
         let initialPlayerId = currentPlayerName + "_" + Date.now(); // Simple unique enough ID for this demo
 
+        const customRoomCode = roomCodeInput.value.trim().toUpperCase();
+        const requestBody = {
+            player_id: initialPlayerId,
+            player_name: currentPlayerName
+        };
+
+        if (customRoomCode) {
+            requestBody.custom_room_code = customRoomCode;
+        }
+
         try {
-            const createRoomResponse = await apiCall('/api/create_room', 'POST', {
-                player_id: initialPlayerId,
-                player_name: currentPlayerName
-            });
+            const createRoomResponse = await apiCall('/api/create_room', 'POST', requestBody);
             // Assuming API returns {data: {room_code: ..., player_id: ...}} 
             // and apiCall returns the inner 'data' object.
             // Or if apiCall returns the full response, it might be response.data.room_code
