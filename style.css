@@ -3,7 +3,7 @@ body {
     margin: 0;
     padding: 20px;
     background-color: #4A6B65; /* Muted Teal from image - fallback color */
-    background-image: url('path/to/your/background-image.jpg'); /* Add your background image path */
+    background-image: url('sprites/background.png'); /* Mountain background */
     background-size: cover; /* Ensures the image covers the entire viewport */
     background-position: center; /* Centers the image */
     background-repeat: no-repeat; /* Prevents image repetition */
